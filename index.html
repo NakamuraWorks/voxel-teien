@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>ボクセル日本庭園 — Voxel Teien</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23141009'/%3E%3Crect x='3' y='5' width='26' height='4' rx='1' fill='%23d4553f'/%3E%3Crect x='8' y='12' width='16' height='3' fill='%23d4553f'/%3E%3Crect x='9' y='9' width='4' height='20' fill='%23d4553f'/%3E%3Crect x='19' y='9' width='4' height='20' fill='%23d4553f'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+
+    <div id="hud" class="hidden">
+      <div id="crosshair" aria-hidden="true"></div>
+
+      <section id="status">
+        <div class="row"><span class="k">時刻</span><span id="clock">06:20</span></div>
+        <div class="row"><span class="k">場所</span><span id="place">総門</span></div>
+        <div class="row"><span class="k">fps</span><span id="fps" class="dim">—</span></div>
+      </section>
+
+      <section id="map">
+        <canvas id="minimap" width="176" height="176"></canvas>
+        <div id="maplabel">庭園鳥瞰</div>
+      </section>
+
+      <section id="hint">
+        <div><b>WASD</b> 歩く <b>Shift</b> 小走 <b>Space</b> 跳ぶ <b>視点</b> マウス</div>
+        <div><b>V</b> 自動ガイド <b>T</b> 刻々 <b>C</b> 庭園周遊 <b>F</b> 空を飛ぶ</div>
+        <div><b>L</b> 灯籠 <b>M</b> 音 <b>H</b> 表示 <b>Esc</b> 解除</div>
+        <div><b>- =</b> 音量 <b>, .</b> BGM の大きさ</div>
+      </section>
+
+      <section id="volume">
+        <div class="row"><span class="k">音量</span><span id="vol-master-value">100</span></div>
+        <input id="vol-master" type="range" min="0" max="100" step="1" value="100" aria-label="全体の音量" />
+        <div class="row"><span class="k">BGM</span><span id="vol-bgm-value">34</span></div>
+        <input id="vol-bgm" type="range" min="0" max="100" step="1" value="34" aria-label="自動ガイド中の音楽音量" />
+        <div id="volume-note">自動ガイド・周遊中に鳴ります<br />スライダーは Esc 後にドラッグ</div>
+      </section>
+
+      <div id="caption" class="hidden">
+        <div id="caption-title"></div>
+        <div id="caption-text"></div>
+        <div id="caption-progress"></div>
+      </div>
+
+      <div id="toast" class="hidden"></div>
+      <div id="wet" aria-hidden="true"></div>
+    </div>
+
+    <div id="boot">
+      <div id="boot-inner">
+        <h1>ボクセル日本庭園</h1>
+        <p class="sub">Voxel Teien — 歩き回れる回遊式庭園</p>
+        <div id="progress"><div id="progress-bar"></div></div>
+        <div id="stage-name">庭園を設計中…</div>
+        <button id="start" class="hidden">庭に入る</button>
+        <p class="keys">
+          マウスで視点 / WASD で移動 / V で自動ガイドが八つの見どころを案内します。<br />
+          イヤホンやヘッドフォンがあると、渓流の水音・風・鳥の声まで再現されます。<br />
+          自動ガイドと庭園周遊のあいだは音楽が流れます。音量は - = 、BGM は , . でも調整できます。
+        </p>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

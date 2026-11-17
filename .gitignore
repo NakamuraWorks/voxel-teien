@@ -1,0 +1,43 @@
+# 依存とビルド成果物
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+
+# ローカル環境・シークレット
+.env
+.env.*
+!.env.example
+
+# ログ
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# テスト / ビルドの中間物
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# エディタ / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Qwen Code のローカル状態。settings.json はチーム共有の設定なので追跡する
+.qwen/*
+!.qwen/settings.json
+.qwen_node_repl_cell_*.mjs
+
+# 注意: src/audio/庭の静けさと.mp3 はアプリが import する実体アセット。
+# *.mp3 など音声拡張子をまとめて除外すると、ビルドは通っても庭が黙って無音になる。
