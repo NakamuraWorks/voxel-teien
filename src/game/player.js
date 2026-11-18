@@ -1,6 +1,8 @@
-// First-person walker: pointer-lock look, voxel AABB collision with auto step-up, wading,
-// sprint and a fly mode. Positions are in voxel units (1 voxel ≈ 0.32 m).
+// First-person walker: pointer-lock look (mouse or gamepad stick, Y-axis invertible),
+// voxel AABB collision with auto step-up, wading, sprint and a fly mode. Positions are in
+// voxel units (1 voxel ≈ 0.32 m).
 import { T, soundOf } from '../core/palette.js';
+import { settings } from './settings.js';
 
 export const VIEW = {
   eye: 4.55,
@@ -36,10 +38,13 @@ export function createPlayer(canvas, world) {
     locked: false,
     enabled: true,
     lookEnabled: true,
+    invertY: settings.invertY,
     debug: { blockedX: false, blockedZ: false, stepped: false, hitY: 0 }
   };
   const keys = new Set();
   const LOOK = 0.0022;
+  // Live gamepad axes fed by main.js every frame (see src/game/gamepad.js).
+  const pad = { mx: 0, mz: 0, sprint: false, jump: false, ascend: false, descend: false };
 
   function isSolid(x, y, z) {
     return world.isSolid(x, y, z);
@@ -164,14 +169,14 @@ export function createPlayer(canvas, world) {
     const back = keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0;
     const left = keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0;
     const right = keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0;
-    let mx = right - left;
-    let mz = forward - back;
+    let mx = right - left + pad.mx;
+    let mz = forward - back + pad.mz;
     const mag = Math.hypot(mx, mz);
-    if (mag > 0) {
+    if (mag > 1) {
       mx /= mag;
       mz /= mag;
     }
-    p.sprint = keys.has('ShiftLeft') || keys.has('ShiftRight');
+    p.sprint = keys.has('ShiftLeft') || keys.has('ShiftRight') || pad.sprint;
 
     // Local axes from yaw: forward points to -Z when yaw is 0.
     const sinY = Math.sin(p.yaw);
@@ -187,13 +192,13 @@ export function createPlayer(canvas, world) {
     p.vel.z += (wishZ * speed - p.vel.z) * Math.min(1, accel * dt * 0.14);
 
     if (p.fly) {
-      const up = (keys.has('Space') ? 1 : 0) - (keys.has('ControlLeft') || keys.has('KeyQ') ? 1 : 0);
+      const up = ((keys.has('Space') || pad.ascend) ? 1 : 0) - ((keys.has('ControlLeft') || keys.has('KeyQ') || pad.descend) ? 1 : 0);
       p.vel.y += (up * speed * 0.7 - p.vel.y) * Math.min(1, 9 * dt);
       p.vel.x *= 1 - Math.min(1, 3.4 * dt);
       p.vel.z *= 1 - Math.min(1, 3.4 * dt);
     } else {
       p.vel.y -= GRAVITY * dt;
-      if (keys.has('Space') && p.grounded && !p.inWater) {
+      if ((keys.has('Space') || pad.jump) && p.grounded && !p.inWater) {
         p.vel.y = JUMP;
         p.grounded = false;
       }
@@ -302,6 +307,12 @@ export function createPlayer(canvas, world) {
   }
 
   // ---- input -----------------------------------------------------------------
+  function applyLook(dx, dy) {
+    p.yaw -= dx;
+    const sign = p.invertY ? -1 : 1;
+    p.pitch = Math.max(-1.45, Math.min(1.45, p.pitch - dy * sign));
+  }
+
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return;
     keys.add(e.code);
@@ -318,23 +329,36 @@ export function createPlayer(canvas, world) {
   });
   document.addEventListener('mousemove', (e) => {
     if (!p.locked || !p.lookEnabled) return;
-    p.yaw -= e.movementX * LOOK;
-    p.pitch -= e.movementY * LOOK;
-    p.pitch = Math.max(-1.45, Math.min(1.45, p.pitch));
+    applyLook(e.movementX * LOOK, e.movementY * LOOK);
   });
+
+  function setPad(input) {
+    if (!input) {
+      pad.mx = pad.mz = 0;
+      pad.sprint = pad.jump = pad.ascend = pad.descend = false;
+      return;
+    }
+    pad.mx = input.moveX || 0;
+    pad.mz = input.moveZ || 0;
+    pad.sprint = !!input.sprint;
+    pad.jump = !!input.jump;
+    pad.ascend = !!input.ascend;
+    pad.descend = !!input.descend;
+  }
 
   return {
     player: p,
     update,
     consumeSteps,
     teleport,
+    setPad,
     keys,
     get looking() {
       return p.locked;
     },
+    applyLook,
     look(yawDelta, pitchDelta) {
-      p.yaw -= yawDelta;
-      p.pitch = Math.max(-1.45, Math.min(1.45, p.pitch - pitchDelta));
+      applyLook(yawDelta, pitchDelta);
     }
   };
 }

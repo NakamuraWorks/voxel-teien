@@ -4,6 +4,8 @@ import { createStage } from './render/scene.js';
 import { createActors } from './render/actors.js';
 import { createPlayer, VIEW } from './game/player.js';
 import { createTour } from './game/tour.js';
+import { createGamepad } from './game/gamepad.js';
+import { settings, setInvertY } from './game/settings.js';
 import { createHud } from './ui/hud.js';
 import { placeName } from './ui/places.js';
 import { createAmbience } from './audio/ambience.js';
@@ -19,6 +21,7 @@ let stage = null;
 let actors = null;
 let controller = null;
 let tour = null;
+let ready = false;
 const audio = createAmbience();
 
 const mode = {
@@ -116,97 +119,144 @@ function nudgeVolume(kind, delta) {
 }
 
 // ---------------------------------------------------------------------------
+// Commands — one implementation per action, driven by keyboard, gamepad, or both.
+// ---------------------------------------------------------------------------
+function moveCancel() {
+  if (!tour.active) return;
+  tour.stop();
+  controller.player.lookEnabled = true;
+  hud.setCaption(null);
+}
+
+const commands = {
+  guide() {
+    if (tour.active) {
+      tour.stop();
+      controller.player.lookEnabled = true;
+      hud.setCaption(null);
+      hud.toast('案内を終了');
+    } else {
+      mode.orbit = false;
+      controller.player.fly = false;
+      // Resume from the stretch of path the walker is standing on, so starting the guide
+      // never drags them back to the gate through a tree.
+      tour.start(progressAlongPolyline(controller.player.pos.x, controller.player.pos.z, ROUTE));
+      controller.player.lookEnabled = false;
+      hud.toast('自動ガイド開始 — もう一度 V で終了', 3200);
+    }
+  },
+  cancelGuide: moveCancel,
+  dayCycle() {
+    mode.cycleDay = !mode.cycleDay;
+    hud.toast(mode.cycleDay ? '日時計 進行' : '日時計 停止');
+  },
+  lanterns() {
+    stage.state.lanternsOn = !stage.state.lanternsOn;
+    hud.toast(stage.state.lanternsOn ? '灯籠を点す' : '灯籠を消す');
+  },
+  mute() {
+    const muted = audio.setMuted(!audio.muted);
+    hud.toast(muted ? '音を防ぐ' : '音を立てる');
+  },
+  volMaster: (d) => nudgeVolume('master', d),
+  volBgm: (d) => nudgeVolume('bgm', d),
+  hud() {
+    mode.hudOn = hud.toggleHud();
+  },
+  fly() {
+    controller.player.fly = !controller.player.fly;
+    controller.player.vel.y = 0;
+    hud.toast(controller.player.fly ? '空を飛ぶ（Space/Q で昇降）' : '地面に降り立つ');
+  },
+  reset() {
+    tour.stop();
+    controller.player.lookEnabled = true;
+    hud.setCaption(null);
+    mode.orbit = false;
+    controller.teleport(site.spawn.x, site.spawn.y + 1, site.spawn.z);
+    controller.player.yaw = site.spawn.yaw;
+    hud.toast('総門まで戻りました');
+  },
+  orbit() {
+    mode.orbit = !mode.orbit;
+    controller.player.lookEnabled = !mode.orbit;
+    if (mode.orbit) tour.stop();
+    hud.setCaption(null);
+    hud.toast(mode.orbit ? '庭園を一望（C でもどる）' : '歩行にもどる');
+  },
+  time(delta) {
+    stage.state.dayT = (stage.state.dayT + delta + 1) % 1;
+  },
+  invert() {
+    const on = setInvertY(!settings.invertY);
+    controller.player.invertY = on;
+    hud.toast(on ? '視点Y軸を反転した' : '視点Y軸をもどした', 1600);
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Hotkeys
 // ---------------------------------------------------------------------------
 window.addEventListener('keydown', (e) => {
   if (!mode.running) return;
   switch (e.code) {
-    case 'KeyV':
-      if (tour.active) {
-        tour.stop();
-        controller.player.lookEnabled = true;
-        hud.setCaption(null);
-        hud.toast('案内を終了');
-      } else {
-        mode.orbit = false;
-        controller.player.fly = false;
-        // Resume from the stretch of path the walker is standing on, so starting the guide
-        // never drags them back to the gate through a tree.
-        tour.start(progressAlongPolyline(controller.player.pos.x, controller.player.pos.z, ROUTE));
-        controller.player.lookEnabled = false;
-        hud.toast('自動ガイド開始 — もう一度 V で終了', 3200);
-      }
-      break;
-    case 'KeyT':
-      mode.cycleDay = !mode.cycleDay;
-      hud.toast(mode.cycleDay ? '日時計 進行' : '日時計 停止');
-      break;
-    case 'KeyL':
-      stage.state.lanternsOn = !stage.state.lanternsOn;
-      hud.toast(stage.state.lanternsOn ? '灯籠を点す' : '灯籠を消す');
-      break;
-    case 'KeyM': {
-      const muted = audio.setMuted(!audio.muted);
-      hud.toast(muted ? '音を防ぐ' : '音を立てる');
-      break;
-    }
+    case 'KeyV': commands.guide(); break;
+    case 'KeyT': commands.dayCycle(); break;
+    case 'KeyL': commands.lanterns(); break;
+    case 'KeyM': commands.mute(); break;
     case 'Minus':
-    case 'NumpadSubtract':
-      nudgeVolume('master', -0.05);
-      break;
+    case 'NumpadSubtract': commands.volMaster(-0.05); break;
     case 'Equal':
-    case 'NumpadAdd':
-      nudgeVolume('master', 0.05);
-      break;
-    case 'Comma':
-      nudgeVolume('bgm', -0.05);
-      break;
-    case 'Period':
-      nudgeVolume('bgm', 0.05);
-      break;
-    case 'KeyH':
-      mode.hudOn = hud.toggleHud();
-      break;
-    case 'KeyF':
-      controller.player.fly = !controller.player.fly;
-      controller.player.vel.y = 0;
-      hud.toast(controller.player.fly ? '空を飛ぶ（Space/Q で昇降）' : '地面に降り立つ');
-      break;
-    case 'KeyR':
-      tour.stop();
-      controller.player.lookEnabled = true;
-      hud.setCaption(null);
-      mode.orbit = false;
-      controller.teleport(site.spawn.x, site.spawn.y + 1, site.spawn.z);
-      controller.player.yaw = site.spawn.yaw;
-      hud.toast('総門まで戻りました');
-      break;
-    case 'KeyC':
-      mode.orbit = !mode.orbit;
-      controller.player.lookEnabled = !mode.orbit;
-      if (mode.orbit) tour.stop();
-      hud.setCaption(null);
-      hud.toast(mode.orbit ? '庭園を一望（C でもどる）' : '歩行にもどる');
-      break;
-    case 'BracketLeft':
-      stage.state.dayT = (stage.state.dayT + 0.986 + 1) % 1;
-      break;
-    case 'BracketRight':
-      stage.state.dayT = (stage.state.dayT + 0.014) % 1;
-      break;
-    case 'Escape':
-      if (tour.active) {
-        tour.stop();
-        controller.player.lookEnabled = true;
-        hud.setCaption(null);
-      }
-      break;
+    case 'NumpadAdd': commands.volMaster(0.05); break;
+    case 'Comma': commands.volBgm(-0.05); break;
+    case 'Period': commands.volBgm(0.05); break;
+    case 'KeyH': commands.hud(); break;
+    case 'KeyF': commands.fly(); break;
+    case 'KeyR': commands.reset(); break;
+    case 'KeyC': commands.orbit(); break;
+    case 'KeyI': commands.invert(); break;
+    case 'BracketLeft': commands.time(-0.014); break;
+    case 'BracketRight': commands.time(0.014); break;
+    case 'Escape': commands.cancelGuide(); break;
     default:
-      if (tour.active && ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) {
-        tour.stop();
-        controller.player.lookEnabled = true;
-        hud.setCaption(null);
-      }
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) moveCancel();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Gamepad. Left stick walks, right stick looks, A jumps (held), LT sprints /
+// descends, RT ascends, and the face + shoulder buttons fire the commands above.
+// ---------------------------------------------------------------------------
+const LOOK_PAD = 2.6; // rad/s at full right-stick deflection
+
+const gamepad = createGamepad({
+  onPress(name) {
+    if (!mode.running) {
+      if (ready && (name === 'A' || name === 'START')) hud.elements.start.click();
+      return;
+    }
+    switch (name) {
+      case 'START': commands.guide(); break;
+      case 'B': commands.cancelGuide(); break;
+      case 'X': commands.dayCycle(); break;
+      case 'Y': commands.reset(); break;
+      case 'BACK': commands.lanterns(); break;
+      case 'L3': commands.hud(); break;
+      case 'R3': commands.fly(); break;
+      case 'LB': commands.time(-0.014); break;
+      case 'RB': commands.time(0.014); break;
+      case 'UP': commands.volBgm(0.05); break;
+      case 'DOWN': commands.volBgm(-0.05); break;
+      case 'LEFT': commands.volMaster(-0.05); break;
+      case 'RIGHT': commands.volMaster(0.05); break;
+      case 'A': break; // jump is a held state read by the controller
+    }
+  },
+  onConnect() {
+    hud.toast('ゲームパッド接続 — 左:移動 右:視点 A:跳ぶ Start:案内', 3600);
+  },
+  onDisconnect() {
+    hud.toast('ゲームパッドを外した');
   }
 });
 
@@ -229,6 +279,20 @@ function frame(now) {
 
   const player = controller.player;
   if (mode.running) {
+    // Gamepad: feed the walking axes every frame (stale stick values must not stick),
+    // turn with the right stick without needing pointer lock, and bail out of the
+    // guide the moment the left stick is pushed, exactly like WASD does.
+    const pad = gamepad.poll();
+    if (pad) {
+      if (tour.active && Math.hypot(pad.moveX, pad.moveZ) > 0.6) moveCancel();
+      controller.setPad(mode.orbit ? null : pad);
+      if (!mode.orbit && !tour.active && player.lookEnabled && (pad.lookX !== 0 || pad.lookY !== 0)) {
+        controller.applyLook(pad.lookX * LOOK_PAD * dt, pad.lookY * LOOK_PAD * dt);
+      }
+    } else {
+      controller.setPad(null);
+    }
+
     if (tour.active) {
       const res = tour.update(dt, player);
       hud.setCaption(res.index);
@@ -317,6 +381,7 @@ function frame(now) {
 }
 
 build().then(() => {
+  ready = true;
   hud.beginGame(startGame);
   hud.bindVolume({
     master: (v) => audio.setVolume(v),
