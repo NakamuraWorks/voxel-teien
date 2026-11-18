@@ -1,29 +1,31 @@
 // First-person walker: pointer-lock look (mouse or gamepad stick, Y-axis invertible),
-// voxel AABB collision with auto step-up, wading, sprint and a fly mode. Positions are in
-// voxel units (1 voxel ≈ 0.32 m).
+// voxel AABB collision with auto step-up, wading, sprint and a fly mode. All positions,
+// lengths and speeds are in WORLD voxels (see layout.js RES; 1 design voxel ×RES).
 import { T, soundOf } from '../core/palette.js';
+import { RES } from '../garden/layout.js';
 import { settings } from './settings.js';
 
 export const VIEW = {
-  eye: 4.55,
-  height: 5.2,
-  half: 0.62,
-  stepUp: 1.15
+  eye: 4.55 * RES,
+  height: 5.2 * RES,
+  half: 0.62 * RES,
+  stepUp: 1.15 * RES
 };
 
-const GRAVITY = 26;
-const JUMP = 8.6;
-const WALK = 8.2;
-const SPRINT = 13.6;
-const GROUND_ACCEL = 64;
-const AIR_ACCEL = 22;
+// Time constants (1/s damping, angular rates) stay physical; lengths and velocities ×RES.
+const GRAVITY = 26 * RES;
+const JUMP = 8.6 * RES;
+const WALK = 8.2 * RES;
+const SPRINT = 13.6 * RES;
+const GROUND_ACCEL = 64 * RES;
+const AIR_ACCEL = 22 * RES;
 const FRICTION = 13;
 const FRICTION_AIR = 1.4;
-const FLY_SPEED = 24;
+const FLY_SPEED = 24 * RES;
 
 export function createPlayer(canvas, world) {
   const p = {
-    pos: { x: 65.5, y: 20, z: 119.5 },
+    pos: { x: 65 * RES + RES / 2, y: 20 * RES, z: 119 * RES + RES / 2 },
     vel: { x: 0, y: 0, z: 0 },
     yaw: 0,
     pitch: -0.04,
@@ -121,7 +123,7 @@ export function createPlayer(canvas, world) {
   }
 
   /** Highest solid surface at or below `fromY` under the walker's footprint. */
-  function supportBelow(fromY, depth = VIEW.stepUp + 0.5) {
+  function supportBelow(fromY, depth = VIEW.stepUp + 0.5 * RES) {
     const x0 = Math.floor(p.pos.x - VIEW.half);
     const x1 = Math.floor(p.pos.x + VIEW.half);
     const z0 = Math.floor(p.pos.z - VIEW.half);
@@ -142,11 +144,11 @@ export function createPlayer(canvas, world) {
     const fx = Math.floor(p.pos.x);
     const fz = Math.floor(p.pos.z);
     let depth = 0;
-    for (let k = 0; k < 8; k++) {
+    for (let k = 0; k < 8 * RES; k++) {
       if (world.get(fx, Math.floor(p.pos.y) + k, fz) === T.WATER) depth = k + 1;
       else break;
     }
-    p.inWater = world.get(fx, Math.floor(p.pos.y + 0.3), fz) === T.WATER;
+    p.inWater = world.get(fx, Math.floor(p.pos.y + 0.3 * RES), fz) === T.WATER;
     p.waterDepth = depth;
   }
 
@@ -263,7 +265,7 @@ export function createPlayer(canvas, world) {
       if (dy < 0) {
         p.grounded = true;
         const land = Math.abs(dy);
-        if (land > 9) p.steps.push({ kind: 'land', strength: Math.min(1, land / 16) });
+        if (land > 9 * RES) p.steps.push({ kind: 'land', strength: Math.min(1, land / (16 * RES)) });
       }
     } else {
       const support = groundCheck();
@@ -271,8 +273,8 @@ export function createPlayer(canvas, world) {
     }
 
     // Fall-safety: never let the walker leave the world.
-    if (p.pos.y < -6) {
-      p.pos.y = 40;
+    if (p.pos.y < -6 * RES) {
+      p.pos.y = 40 * RES;
       p.vel.y = 0;
     }
 
@@ -281,13 +283,13 @@ export function createPlayer(canvas, world) {
     const moved = Math.hypot(p.pos.x - prevX, p.pos.z - prevZ);
     if (p.grounded && moved > 0.001) {
       p.stride += moved;
-      const stride = p.sprint ? 2.5 : 1.9;
+      const stride = (p.sprint ? 2.5 : 1.9) * RES;
       if (p.stride > stride * (p.inWater ? 1.35 : 1)) {
         p.stride = 0;
         p.steps.push({ kind: p.inWater && p.waterDepth > 0 ? 'splash' : 'step', surface: surfaceSound(), strength: p.sprint ? 1 : 0.7 });
       }
     }
-    const targetBob = p.grounded && moved > 0.001 ? Math.sin(performance.now() * 0.001 * (p.sprint ? 13 : 9)) * (p.sprint ? 0.1 : 0.055) : 0;
+    const targetBob = p.grounded && moved > 0.001 ? Math.sin(performance.now() * 0.001 * (p.sprint ? 13 : 9)) * (p.sprint ? 0.1 : 0.055) * RES : 0;
     p.bob += (targetBob - p.bob) * Math.min(1, 8 * dt);
     if (p.pos.y !== prevY) p.verticalMoved = p.pos.y - prevY;
     return p;

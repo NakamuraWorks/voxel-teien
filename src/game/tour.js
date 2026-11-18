@@ -1,16 +1,16 @@
 // The built-in walkthrough guide: walks the circuit, keeps the walker on the ground as the
 // route climbs and falls, turns the head toward each subject and shows the caption card.
 // Press V to start, V / Esc / any movement key to leave it.
-import { TOUR, ROUTE, tAtPoint } from '../garden/layout.js';
+import { TOUR, ROUTE, RES, tAtPoint } from '../garden/layout.js';
 import { VIEW } from '../game/player.js';
 
 const DURATION = 168; // seconds for the whole circuit
 const WINDOW = 0.048; // how wide a stop's caption stays up
 const GROUND_FOLLOW = 3; // how fast the feet chase the planned height (1/s)
-const GLIDE = 6; // hard cap on the guide's vertical speed (voxels/s ≈ 1.9 m/s)
-const LOOK_AHEAD = 5; // polyline samples (~3 voxels) the ground is read from, so steps are climbed early
+const GLIDE = 6 * RES; // hard cap on the guide's vertical speed (world voxels/s)
+const LOOK_AHEAD = 5; // polyline samples the ground is read from, so steps are climbed early
 const BLEND = 3; // ± samples of averaging on top of that
-const PROBE = 8; // rows the safety probe looks down before calling a column a hole
+const PROBE = 8 * RES; // rows the safety probe looks down before calling a column a hole
 
 export function createTour(site) {
   const world = site.world;
@@ -39,7 +39,7 @@ export function createTour(site) {
    */
   function planFloor() {
     const raw = new Float64Array(route.length);
-    let foot = site.spawn ? site.spawn.y : 14;
+    let foot = site.spawn ? site.spawn.y : 14 * RES;
     for (let i = 0; i < route.length; i++) {
       const row = world.topY(
         Math.round(route[i].x),
@@ -101,8 +101,8 @@ export function createTour(site) {
       return { index: null, t: 1, finished: true };
     }
     const here = pointAt(t);
-    player.pos.x += (here.x + 0.5 - player.pos.x) * Math.min(1, dt * 2.4);
-    player.pos.z += (here.z + 0.5 - player.pos.z) * Math.min(1, dt * 2.4);
+    player.pos.x += (here.x + RES / 2 - player.pos.x) * Math.min(1, dt * 2.4);
+    player.pos.z += (here.z + RES / 2 - player.pos.z) * Math.min(1, dt * 2.4);
     player.vel.x *= 0.55;
     player.vel.z *= 0.55;
 
@@ -138,13 +138,13 @@ export function createTour(site) {
       const ahead = pointAt(Math.min(1, t + 0.02));
       aim = ahead;
     }
-    const dx = aim.x + 0.5 - player.pos.x;
-    const dz = aim.z + 0.5 - player.pos.z;
+    const dx = aim.x + RES / 2 - player.pos.x;
+    const dz = aim.z + RES / 2 - player.pos.z;
     const wanted = Math.atan2(-dx, -dz);
     player.yaw += nearestAngle(player.yaw, wanted) * Math.min(1, dt * 1.7);
-    const eyeY = player.pos.y + 4.55;
-    const aimY = aim.y === undefined ? player.pos.y + 4.7 : aim.y;
-    const wantedPitch = Math.atan2(aimY - eyeY, Math.max(1, Math.hypot(dx, dz)));
+    const eyeY = player.pos.y + VIEW.eye;
+    const aimY = aim.y === undefined ? player.pos.y + VIEW.eye + 0.15 * RES : aim.y;
+    const wantedPitch = Math.atan2(aimY - eyeY, Math.max(RES, Math.hypot(dx, dz)));
     player.pitch += (Math.max(-0.5, Math.min(0.35, wantedPitch * 0.5)) - player.pitch) * Math.min(1, dt * 1.5);
     if (index !== shownIndex) {
       shownIndex = index;

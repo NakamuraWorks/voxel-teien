@@ -2,7 +2,7 @@
 // turned into three meshes here: opaque (shadowed), emissive (lantern fire) and water.
 import * as THREE from 'three';
 import { makeWaterNormals } from './textures.js';
-import { WATER_TOP } from '../garden/layout.js';
+import { WATER_TOP, RES } from '../garden/layout.js';
 
 const SKY_VERT = /* glsl */ `
   varying vec3 vWorld;
@@ -77,7 +77,8 @@ function sampleDay(dayT, out) {
   out.sunI = a.sunI + (b.sunI - a.sunI) * k;
   out.hemiI = a.hemiI + (b.hemiI - a.hemiI) * k;
   out.ambI = a.ambI + (b.ambI - a.ambI) * k;
-  out.fog = a.fog + (b.fog - a.fog) * k;
+  // Keyframe densities are per design voxel; world voxels are RES times finer.
+  out.fog = (a.fog + (b.fog - a.fog) * k) / RES;
   return out;
 }
 
@@ -96,9 +97,9 @@ export function createStage(canvas, site, geoms) {
   renderer.toneMappingExposure = 1.05;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x9fb3c0, 0.0085);
+  scene.fog = new THREE.FogExp2(0x9fb3c0, 0.0085 / RES);
 
-  const camera = new THREE.PerspectiveCamera(66, window.innerWidth / window.innerHeight, 0.35, 900);
+  const camera = new THREE.PerspectiveCamera(66, window.innerWidth / window.innerHeight, 0.35, 900 * RES);
   camera.rotation.order = 'YXZ';
 
   // ---- static geometry -------------------------------------------------------
@@ -116,8 +117,8 @@ export function createStage(canvas, site, geoms) {
   const pos = waterGeo.getAttribute('position');
   const uvs = new Float32Array(pos.count * 2);
   for (let i = 0; i < pos.count; i++) {
-    uvs[i * 2] = pos.getX(i) * 0.09;
-    uvs[i * 2 + 1] = pos.getZ(i) * 0.09;
+    uvs[i * 2] = (pos.getX(i) * 0.09) / RES;
+    uvs[i * 2 + 1] = (pos.getZ(i) * 0.09) / RES;
   }
   waterGeo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   const waterNormalMap = makeWaterNormals(128);
@@ -147,7 +148,7 @@ export function createStage(canvas, site, geoms) {
     uCam: { value: new THREE.Vector3() }
   };
   const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(480, 32, 20),
+    new THREE.SphereGeometry(480 * RES, 32, 20),
     new THREE.ShaderMaterial({
       uniforms: skyUniforms,
       vertexShader: SKY_VERT,
@@ -168,14 +169,14 @@ export function createStage(canvas, site, geoms) {
   const sun = new THREE.DirectionalLight(0xffffff, 2.6);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -58;
-  sun.shadow.camera.right = 58;
-  sun.shadow.camera.top = 58;
-  sun.shadow.camera.bottom = -58;
+  sun.shadow.camera.left = -58 * RES;
+  sun.shadow.camera.right = 58 * RES;
+  sun.shadow.camera.top = 58 * RES;
+  sun.shadow.camera.bottom = -58 * RES;
   sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 320;
+  sun.shadow.camera.far = 320 * RES;
   sun.shadow.bias = -0.0006;
-  sun.shadow.normalBias = 0.55;
+  sun.shadow.normalBias = 0.55 * RES;
   sun.target = new THREE.Object3D();
   scene.add(sun, sun.target);
 
@@ -242,17 +243,17 @@ export function createStage(canvas, site, geoms) {
     waterNormalMap.offset.x += dt * 0.014;
     waterNormalMap.offset.y += dt * 0.009;
 
-    // Keep the shadow texels stable by snapping the follow point to a 4-unit lattice.
-    const ax = Math.round(focus.x / 4) * 4;
-    const ay = Math.round(focus.y / 4) * 4;
-    const az = Math.round(focus.z / 4) * 4;
-    if (Math.abs(ax - shadowAnchor.x) > 3 || Math.abs(az - shadowAnchor.z) > 3) {
+    // Keep the shadow texels stable by snapping the follow point to a coarse lattice.
+    const ax = Math.round(focus.x / (2 * RES)) * (2 * RES);
+    const ay = Math.round(focus.y / (2 * RES)) * (2 * RES);
+    const az = Math.round(focus.z / (2 * RES)) * (2 * RES);
+    if (Math.abs(ax - shadowAnchor.x) > 3 * RES || Math.abs(az - shadowAnchor.z) > 3 * RES) {
       shadowAnchor.set(ax, ay, az);
     }
     sun.position.set(
-      shadowAnchor.x + sunDir.x * 140,
-      shadowAnchor.y + Math.max(sunDir.y, 0.12) * 140,
-      shadowAnchor.z + sunDir.z * 140
+      shadowAnchor.x + sunDir.x * 140 * RES,
+      shadowAnchor.y + Math.max(sunDir.y, 0.12) * 140 * RES,
+      shadowAnchor.z + sunDir.z * 140 * RES
     );
     sun.target.position.copy(shadowAnchor);
     sun.target.updateMatrixWorld();

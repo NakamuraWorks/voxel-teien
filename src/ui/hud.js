@@ -1,6 +1,6 @@
 // All DOM: loading screen, status read-out, caption card, toasts and the hand-drawn minimap.
 import { T, NAMES } from '../core/palette.js';
-import { TOUR, tAtPoint, ROUTE } from '../garden/layout.js';
+import { TOUR, tAtPoint, ROUTE, RES } from '../garden/layout.js';
 
 const INK = '#f3ece0';
 
@@ -98,14 +98,15 @@ export function createHud() {
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
         const i = z * sizeX + x;
-        const top = site.world.topY(x, z, 30);
+        const top = site.world.topY(x, z, 30 * RES);
         const id = top >= 0 ? site.world.get(x, top, z) : T.AIR;
         const key = NAMES[id];
         let rgb = MINIMAP_COLOR[key] || [70, 78, 62];
-        // Relief: slope toward the north-west brightens, away darkens.
+        // Relief: slope toward the north-west brightens, away darkens. Ground is sampled
+        // per world voxel (finer by RES), so the gain comes back down by RES.
         const hl = site.ground[i] - site.ground[Math.max(0, i - 1)];
         const hd = site.ground[i] - site.ground[Math.max(0, i - sizeX)];
-        const relief = (hl + hd) * 7;
+        const relief = (hl + hd) * (7 / RES);
         const height = 0.8 + ((site.ground[i] - minH) / (maxH - minH || 1)) * 0.3;
         const k = Math.max(0.42, Math.min(1.5, height + relief));
         const o = i * 4;
@@ -204,7 +205,7 @@ export function createHud() {
     mctx.save();
     mctx.translate(px * scale, pz * scale);
     mctx.rotate(angle);
-    const reach = 17 + cameraY * 0.12;
+    const reach = 17 + (cameraY / RES) * 0.12;
     const grad = mctx.createRadialGradient(0, 0, 0, 0, 0, reach);
     grad.addColorStop(0, 'rgba(255,246,230,0.42)');
     grad.addColorStop(1, 'rgba(255,246,230,0)');

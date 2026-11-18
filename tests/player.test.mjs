@@ -8,7 +8,7 @@ const fakeCanvas = { addEventListener() {}, requestPointerLock() {} };
 
 const { generateGarden } = await import('../src/garden/generate.js');
 const { createPlayer, VIEW } = await import('../src/game/player.js');
-const { ROUTE } = await import('../src/garden/layout.js');
+const { ROUTE, RES } = await import('../src/garden/layout.js');
 
 const site = generateGarden();
 const dt = 1 / 60;
@@ -22,12 +22,12 @@ test('gravity settles the walker onto the entrance paving', () => {
   const controller = spawnController();
   const player = controller.player;
   player.pos.x = site.spawn.x;
-  player.pos.y = site.spawn.y + 6;
+  player.pos.y = site.spawn.y + 6 * RES;
   player.pos.z = site.spawn.z;
   for (let i = 0; i < 120; i++) controller.update(dt);
   assert.equal(player.grounded, true, 'should be standing after falling');
-  const floor = Math.round(site.ground[Math.round(player.pos.z) * 128 + Math.round(player.pos.x)]);
-  assert.ok(Math.abs(player.pos.y - (floor + 1)) < 1.6, `feet at ${player.pos.y}, ground top row ${floor}`);
+  const floor = Math.round(site.ground[Math.round(player.pos.z) * site.size.x + Math.round(player.pos.x)]);
+  assert.ok(Math.abs(player.pos.y - (floor + 1)) < 1.6 * RES, `feet at ${player.pos.y}, ground top row ${floor}`);
   assert.ok(player.pos.y > 0, 'must not sink through the world');
 });
 
@@ -43,7 +43,7 @@ test('walking forward moves the walker and keeps them supported', () => {
   controller.keys.add('KeyW');
   for (let i = 0; i < 180; i++) controller.update(dt);
   const travelled = startZ - p.pos.z;
-  assert.ok(travelled > 8, `only travelled ${travelled.toFixed(2)} north (blocked?)`);
+  assert.ok(travelled > 8 * RES, `only travelled ${travelled.toFixed(2)} north (blocked?)`);
   assert.ok(p.pos.y > 0, 'fell out of the world');
   assert.equal(Number.isFinite(p.pos.x) && Number.isFinite(p.pos.y) && Number.isFinite(p.pos.z), true);
 });
@@ -55,8 +55,8 @@ test('a single-voxel stone is stepped onto, not walked through', () => {
   const stone = site.stones.find((s) => s.y > 0);
   assert.ok(stone, 'generation should have laid stepping stones');
   p.pos.x = stone.x + 0.5;
-  p.pos.z = stone.z + 4.5;
-  p.pos.y = stone.y + 3;
+  p.pos.z = stone.z + 4.5 * RES;
+  p.pos.y = stone.y + 3 * RES;
   p.yaw = 0; // forward is -Z, i.e. toward the stone
   for (let i = 0; i < 40; i++) controller.update(dt);
   controller.keys.add('KeyW');
@@ -83,11 +83,11 @@ test('the whole circuit is walkable with the real collision code', () => {
   let closestLapDistance = Infinity;
   while (frames < 30000 && waypoint < ROUTE.length) {
     const target = ROUTE[waypoint];
-    const dx = target.x + 0.5 - p.pos.x;
-    const dz = target.z + 0.5 - p.pos.z;
+    const dx = target.x + RES / 2 - p.pos.x;
+    const dz = target.z + RES / 2 - p.pos.z;
     const dist = Math.hypot(dx, dz);
     closestLapDistance = Math.min(closestLapDistance, dist);
-    if (dist < 3.2) {
+    if (dist < 3.2 * RES) {
       waypoint++;
       continue;
     }
@@ -95,7 +95,7 @@ test('the whole circuit is walkable with the real collision code', () => {
     controller.update(dt);
     frames++;
     if (p.grounded) groundedFrames++;
-    if (p.pos.y < -5) break;
+    if (p.pos.y < -5 * RES) break;
   }
 
   const summary = {

@@ -3,7 +3,7 @@
 import { VoxelWorld } from '../core/world.js';
 import { T } from '../core/palette.js';
 import { Rng } from '../core/noise.js';
-import { SX, SY, SZ, SEED, WATER_TOP, STREAM } from './layout.js';
+import { SX, SY, SZ, RES, SEED, POND, WATER_TOP, STREAM } from './layout.js';
 import { sculptHeights, carveWater, paintGround, groundAt, gIndex } from './terrain.js';
 import { flattenRoute, laySteppingStones, routePolyline, spawnPoint, clearRoute, clearDeckView } from './paths.js';
 import { buildStructures } from './structures.js';
@@ -35,29 +35,30 @@ export function createSite(seed = SEED) {
     leafSources: [],
     stones: [],
     koi: [],
-    waterBody: { x: 64, z: 56, r: 26 }
+    waterBody: { x: POND.x, z: POND.z, r: 26 * RES }
   };
 }
 
 function spawnKoi(site, count = 11) {
   const rng = site.rng;
+  const wb = site.waterBody;
   for (let k = 0; k < count; k++) {
     for (let tries = 0; tries < 60; tries++) {
-      const x = 64 + (rng.float() - 0.5) * 40;
-      const z = 56 + (rng.float() - 0.5) * 30;
+      const x = wb.x + (rng.float() - 0.5) * 40 * RES;
+      const z = wb.z + (rng.float() - 0.5) * 30 * RES;
       const i = gIndex(Math.round(x), Math.round(z));
-      if (!site.pondMask[i] || site.waterDepth[i] < 2) continue;
+      if (!site.pondMask[i] || site.waterDepth[i] < 2 * RES) continue;
       const top = site.waterTop[i];
       // Stepping stones and shore stones can replace the water column after carving.
       if (site.world.get(Math.round(x), top, Math.round(z)) !== T.WATER) continue;
       site.koi.push({
-        x: Math.round(x) + 0.5,
-        z: Math.round(z) + 0.5,
+        x: Math.round(x) + RES / 2,
+        z: Math.round(z) + RES / 2,
         y: top,
         home: { x, z },
         phase: rng.float() * Math.PI * 2,
         speed: 0.5 + rng.float() * 0.8,
-        radius: 3 + rng.float() * 6,
+        radius: (3 + rng.float() * 6) * RES,
         tone: rng.int(0, 2)
       });
       break;
@@ -88,9 +89,9 @@ export function gardenStages(site) {
       run: () => {
         spawnKoi(site);
         for (const c of site.cascades) {
-          site.ripples.push({ x: c.x, y: c.y + 1, z: c.z, period: 1.1, scale: 1.3, phase: 0 });
+          site.ripples.push({ x: c.x, y: c.y + RES, z: c.z, period: 1.1, scale: 1.3, phase: 0 });
         }
-        site.route = routePolyline(0.6);
+        site.route = routePolyline(0.6 * RES);
         site.spawn = spawnPoint(site);
       }
     }

@@ -9,7 +9,7 @@ import { settings, setInvertY } from './game/settings.js';
 import { createHud } from './ui/hud.js';
 import { placeName } from './ui/places.js';
 import { createAmbience } from './audio/ambience.js';
-import { pondField, STREAM, distToPolyline, WATER_TOP, ROUTE, progressAlongPolyline } from './garden/layout.js';
+import { pondField, STREAM, distToPolyline, WATER_TOP, ROUTE, RES, progressAlongPolyline } from './garden/layout.js';
 import { clamp, smoothstep } from './core/noise.js';
 
 const canvas = document.getElementById('view');
@@ -71,7 +71,7 @@ async function build() {
   actors = createActors(site, stage.scene);
   controller = createPlayer(canvas, site.world);
   tour = createTour(site);
-  hud.drawMinimap(site.spawn.x, site.spawn.z, 0, 20);
+  hud.drawMinimap(site.spawn.x, site.spawn.z, 0, 20 * RES);
   hud.setProgress(1, '用意できました');
   hud.ready();
 }
@@ -84,7 +84,7 @@ function startGame() {
   audio.start();
   audio.bell();
   const spawn = site.spawn;
-  controller.teleport(spawn.x, spawn.y + 1, spawn.z);
+  controller.teleport(spawn.x, spawn.y + RES, spawn.z);
   controller.player.yaw = spawn.yaw;
   controller.player.pitch = -0.02;
   mode.running = true;
@@ -173,7 +173,7 @@ const commands = {
     controller.player.lookEnabled = true;
     hud.setCaption(null);
     mode.orbit = false;
-    controller.teleport(site.spawn.x, site.spawn.y + 1, site.spawn.z);
+    controller.teleport(site.spawn.x, site.spawn.y + RES, site.spawn.z);
     controller.player.yaw = site.spawn.yaw;
     hud.toast('総門まで戻りました');
   },
@@ -306,7 +306,7 @@ function frame(now) {
       controller.update(dt);
       for (const step of controller.consumeSteps()) {
         audio.step(step.kind, step.surface, step.strength);
-        if (step.kind === 'splash') actors.ripple(player.pos.x, WATER_TOP + 1, player.pos.z, 0.55, 1.7);
+        if (step.kind === 'splash') actors.ripple(player.pos.x, WATER_TOP + RES, player.pos.z, 0.55, 1.7);
       }
     } else {
       player.enabled = false;
@@ -322,13 +322,13 @@ function frame(now) {
   // Camera.
   if (mode.orbit) {
     mode.orbitAngle += dt * 0.055;
-    const r = 58 + Math.sin(mode.orbitAngle * 0.6) * 7;
+    const r = (58 + Math.sin(mode.orbitAngle * 0.6) * 7) * RES;
     stage.camera.position.set(
-      64 + Math.cos(mode.orbitAngle) * r,
-      53 + Math.sin(mode.orbitAngle * 0.43) * 5,
-      56 + Math.sin(mode.orbitAngle) * r
+      64 * RES + Math.cos(mode.orbitAngle) * r,
+      (53 + Math.sin(mode.orbitAngle * 0.43) * 5) * RES,
+      56 * RES + Math.sin(mode.orbitAngle) * r
     );
-    stage.camera.lookAt(64, 15, 58);
+    stage.camera.lookAt(64 * RES, 15 * RES, 58 * RES);
   } else {
     stage.camera.position.set(player.pos.x, player.pos.y + VIEW.eye + player.bob, player.pos.z);
     stage.camera.rotation.set(player.pitch, player.yaw, 0);
@@ -343,7 +343,7 @@ function frame(now) {
   const field = pondField(px, pz);
   const dStream = distToPolyline(px, pz, STREAM);
   const nearPond = smoothstep(26, 2, Math.max(0, -field));
-  const nearStream = smoothstep(14, 1, dStream);
+  const nearStream = smoothstep(14 * RES, 1 * RES, dStream);
   const wade = player.inWater ? 1 : 0;
   const wind = 0.4 + 0.35 * Math.sin(stage.state.elapsed * 0.13) * Math.sin(stage.state.elapsed * 0.041);
   audio.tick(dt, {
@@ -354,7 +354,7 @@ function frame(now) {
   });
 
   if (mode.running) {
-    const submerged = clamp((player.waterDepth - 1) / 4, 0, 1);
+    const submerged = clamp((player.waterDepth - RES) / (4 * RES), 0, 1);
     hud.setWet(player.inWater ? 0.18 + submerged * 0.72 : 0);
   }
 

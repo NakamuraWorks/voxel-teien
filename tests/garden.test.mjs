@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateGarden } from '../src/garden/generate.js';
 import { buildGeometries, Mesher, sliceRanges } from '../src/core/mesher.js';
-import { SX, SY, SZ, ROUTE, DECK } from '../src/garden/layout.js';
-import { groundAt } from '../src/garden/terrain.js';
+import { SX, SY, SZ, ROUTE, DECK, RES } from '../src/garden/layout.js';
+import { VIEW } from '../src/game/player.js';
 import { T, NAMES, isFoliage } from '../src/core/palette.js';
 
 const started = Date.now();
@@ -24,13 +24,13 @@ const WALKABLE = new Set([
   T.PLANK, T.WALL_EARTH, T.SHINGLE, T.LEAF_PILE
 ]);
 
-const BODY_HEIGHT = 5;
+const BODY_HEIGHT = 5 * RES;
 
 /**
  * Replay the route the way a walker would: feet stay on the ground, a step up of at most
  * STEP_UP is allowed, and the body needs BODY_HEIGHT of clear space at every sample.
  */
-function walkPath(samples, startY, stepUp = 1.2) {
+function walkPath(samples, startY, stepUp = 1.2 * RES) {
   const problems = [];
   let foot = startY;
   let maxStep = 0;
@@ -95,7 +95,7 @@ test('every pond and stream column has water above its floor', () => {
 test('the strolling route stays walkable end to end', () => {
   const samples = [];
   // Sample the corridor at the walker's half-width so a shoulder cannot clip a trunk.
-  const LANES = [-0.62, 0, 0.62];
+  const LANES = [-VIEW.half, 0, VIEW.half];
   for (let i = 0; i < ROUTE.length - 1; i++) {
     const a = ROUTE[i];
     const b = ROUTE[i + 1];
@@ -112,10 +112,10 @@ test('the strolling route stays walkable end to end', () => {
       }
     }
   }
-  const startFoot = surfaceBelow(65, 121, SY - 1) + 1;
+  const startFoot = surfaceBelow(65 * RES, 121 * RES, SY - 1) + 1;
   const { problems, maxStep } = walkPath(samples, startFoot);
   assert.deepEqual(problems, [], `route not walkable: ${problems.slice(0, 8).join('; ')}`);
-  assert.ok(maxStep <= 2, `route has a step of ${maxStep} voxels, too tall to climb`);
+  assert.ok(maxStep <= 4, `route has a step of ${maxStep} voxels, too tall to climb`);
 });
 
 test('spawn point is dry, solid and has headroom', () => {
@@ -194,20 +194,22 @@ test('Mesher refuses a site instead of a world', () => {
 });
 
 test('the viewing deck looks over a low apron, not a hedge wall', () => {
-  const deckY = Math.round(groundAt(site, (DECK.x0 + DECK.x1) / 2, (DECK.z0 + DECK.z1) / 2)) + 2;
+  // The gravel apron raises site.ground under the deck, so read the platform height from
+  // the build report instead of re-deriving it from the ground field.
+  const deckY = site.structures.deck.y;
   const blocked = [];
-  for (let z = DECK.z0 - 6; z <= DECK.z1 + 6; z++) {
-    for (let x = DECK.x0 - 6; x <= DECK.x1; x++) {
+  for (let z = DECK.z0 - 6 * RES; z <= DECK.z1 + 6 * RES; z++) {
+    for (let x = DECK.x0 - 6 * RES; x <= DECK.x1; x++) {
       if (x >= DECK.x0 && x <= DECK.x1 && z >= DECK.z0 && z <= DECK.z1) continue;
-      for (let y = deckY; y <= deckY + 9; y++) {
+      for (let y = deckY; y <= deckY + 9 * RES; y++) {
         const id = site.world.get(x, y, z);
         if (isFoliage(id)) blocked.push(`(${x},${z}) y${y} ${NAMES[id]}`);
       }
     }
   }
   assert.deepEqual(blocked.slice(0, 8), [], `planting blocks the engawa view (${blocked.length} voxels)`);
-  for (const [x, z] of [[DECK.x0 + 2, DECK.z0 + 2], [111, 66], [DECK.x1 - 1, DECK.z0 + 1]]) {
-    for (let k = 1; k <= 8; k++) {
+  for (const [x, z] of [[DECK.x0 + 2 * RES, DECK.z0 + 2 * RES], [111 * RES, 66 * RES], [DECK.x1 - RES, DECK.z0 + RES]]) {
+    for (let k = 1; k <= BODY_HEIGHT; k++) {
       const id = site.world.get(x, deckY + k, z);
       assert.ok(id === T.AIR || id === T.WATER, `deck at (${x},${z}) has ${NAMES[id]} overhead at y+${k}`);
     }
@@ -215,17 +217,17 @@ test('the viewing deck looks over a low apron, not a hedge wall', () => {
   assert.ok(site.deckClearedVoxels > 0, 'the apron pruning should have cut something');
 
   // The sight line from the engawa to the pond has to stay open at standing eye height.
-  const eye = deckY + 4;
+  const eye = deckY + 4 * RES;
   const PLANTS = new Set([T.BARK, T.BARK_DARK]);
   const closed = [];
   const from = { x: (DECK.x0 + DECK.x1) / 2, z: (DECK.z0 + DECK.z1) / 2 };
   const to = site.waterBody;
-  const steps = Math.ceil(Math.hypot(to.x - from.x, to.z - from.z) * 2);
+  const steps = Math.max(2, Math.round(Math.hypot(to.x - from.x, to.z - from.z)));
   for (let k = 0; k <= steps; k++) {
     const t = k / steps;
     const x = Math.round(from.x + (to.x - from.x) * t);
     const z = Math.round(from.z + (to.z - from.z) * t);
-    for (let y = deckY - 1; y <= eye + 4; y++) {
+    for (let y = deckY - RES; y <= eye + 4 * RES; y++) {
       const id = site.world.get(x, y, z);
       if (isFoliage(id) || PLANTS.has(id)) closed.push(`(${x},${z}) y${y} ${NAMES[id]}`);
     }

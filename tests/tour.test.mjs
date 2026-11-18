@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 const { generateGarden } = await import('../src/garden/generate.js');
 const { createTour } = await import('../src/game/tour.js');
 const { VIEW } = await import('../src/game/player.js');
+const { RES } = await import('../src/garden/layout.js');
 
 const site = generateGarden();
 const dt = 1 / 60;
@@ -67,14 +68,14 @@ test('the guide rides the ground for the whole circuit instead of ploughing thro
   assert.ok(frames > 9000, `the circuit stopped early after ${frames} frames`);
   // The route really does climb (the arch of 五橋 sits ~5 voxels above the entrance paving),
   // so a guide that ignores height would show a flat trace and fail here.
-  assert.ok(summary.yMax - summary.yMin >= 4, `height never followed the terrain: ${JSON.stringify(summary)}`);
+  assert.ok(summary.yMax - summary.yMin >= 4 * RES, `height never followed the terrain: ${JSON.stringify(summary)}`);
   assert.ok(buriedBy < 0.05, `camera sank into the ground by ${buriedBy.toFixed(2)} at ${JSON.stringify(buriedAt)}`);
-  assert.ok(maxJump < 0.2, `height jerked by ${maxJump.toFixed(2)} in one frame`);
+  assert.ok(maxJump < 0.2 * RES, `height jerked by ${maxJump.toFixed(2)} in one frame`);
   assert.ok(player.pos.y > 0 && Number.isFinite(player.pos.y), 'walker left the world');
 });
 
 test('entering the guide from a height settles onto the path smoothly', () => {
-  const player = fakePlayer(site.spawn.y + 24); // as if V was pressed while flying
+  const player = fakePlayer(site.spawn.y + 24 * RES); // as if V was pressed while flying
   player.pos.z = site.route[120].z; // somewhere along the route, mid-garden
   player.pos.x = site.route[120].x;
   const { trace, buriedBy, maxJump } = run(player, 6, 0.26);
@@ -90,13 +91,13 @@ test('entering the guide from a height settles onto the path smoothly', () => {
   console.log(`   glide in: ${JSON.stringify(summary)}`);
 
   // One frame must not teleport: the drop has to be spread over time.
-  assert.ok(trace[0] > site.spawn.y + 20, `height snapped on the first frame: ${trace[0]}`);
+  assert.ok(trace[0] > site.spawn.y + 20 * RES, `height snapped on the first frame: ${trace[0]}`);
   // Close to the walking surface — it may still be a little above it, because the guide reads the
   // ground a few voxels ahead so that steps are climbed early — and never beneath it.
   assert.ok(settled >= floor - 0.05, `drove through the walking surface: ${JSON.stringify(summary)}`);
-  assert.ok(settled - floor < 2.5, `never reached the walking surface: ${JSON.stringify(summary)}`);
+  assert.ok(settled - floor < 2.5 * RES, `never reached the walking surface: ${JSON.stringify(summary)}`);
   assert.ok(buriedBy < 0.05, `sank through the path: ${JSON.stringify(summary)}`);
-  assert.ok(maxJump < 1, `height fell in one lump: ${JSON.stringify(summary)}`);
+  assert.ok(maxJump < 1 * RES, `height fell in one lump: ${JSON.stringify(summary)}`);
 });
 
 test('the guide leaves the walker standing on solid ground', () => {
@@ -107,6 +108,6 @@ test('the guide leaves the walker standing on solid ground', () => {
   const support = surfaceAt(player.pos.x, player.pos.z, player.pos.y + VIEW.stepUp);
   console.log(`   hand-back: feet=${player.pos.y.toFixed(2)} floor=${floor} clearance=${clearance && +clearance.toFixed(3)}`);
   assert.notEqual(support, null, 'nothing under the walker where the guide handed back');
-  assert.ok(clearance !== null && Math.abs(clearance) < 0.4, `left the walker off the ground: ${clearance}`);
+  assert.ok(clearance !== null && Math.abs(clearance) < 0.4 * RES, `left the walker off the ground: ${clearance}`);
   assert.equal(player.vel.y, 0, 'stale vertical velocity would fling them on hand-back');
 });
