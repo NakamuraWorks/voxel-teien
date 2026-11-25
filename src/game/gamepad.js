@@ -98,7 +98,9 @@ export function createGamepad({ onPress, onConnect, onDisconnect } = {}) {
 
     state.connected = true;
     state.moveX = shaped(ax[0] || 0);
-    state.moveZ = shaped(ax[1] || 0);
+    // Standard mapping reads left-stick Y as down-positive, while the walker's moveZ
+    // follows the WASD convention (+1 = forward). Flip here so both inputs agree.
+    state.moveZ = shaped(-(ax[1] || 0));
     state.lookX = shaped(ax[2] || 0);
     state.lookY = shaped(ax[3] || 0);
     const lt = b[PAD.LT] ? (b[PAD.LT].value || (b[PAD.LT].pressed ? 1 : 0)) : 0;
