@@ -2,7 +2,7 @@
 // turned into three meshes here: opaque (shadowed), emissive (lantern fire) and water.
 import * as THREE from 'three';
 import { makeWaterNormals } from './textures.js';
-import { WATER_TOP, RES } from '../garden/layout.js';
+import { WATER_LEVEL, RES } from '../garden/layout.js';
 
 const SKY_VERT = /* glsl */ `
   varying vec3 vWorld;
@@ -282,6 +282,6 @@ export function createStage(canvas, site, geoms) {
     update,
     resize,
     applyDay,
-    waterTop: WATER_TOP
+    waterTop: WATER_LEVEL
   };
 }

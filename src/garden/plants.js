@@ -14,8 +14,18 @@ import {
 const R = RES;
 const inRect = (x, z, r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1;
 
+// Stepping stones, flagstones and stone bases are hardscape the walker stands on. A karikomi
+// mound whose centre is outside the path corridor still overhangs the paving and used to
+// replace those voxels; the corridor pruning pass then cut the foliage out and left the hole
+// behind, so planting must never write over them.
+const HARDSCAPE = new Set([T.STONE, T.STONE_DARK]);
+
 function setV(site, x, y, z, id) {
-  site.world.set(Math.round(x), Math.round(y), Math.round(z), id);
+  const ix = Math.round(x);
+  const iy = Math.round(y);
+  const iz = Math.round(z);
+  if (HARDSCAPE.has(site.world.get(ix, iy, iz))) return;
+  site.world.set(ix, iy, iz, id);
 }
 
 function blob(site, cx, cy, cz, rx, ry, rz, pick, fuzz = 0.28) {
@@ -177,7 +187,7 @@ export function paintMoss(site, x, z, rng) {
       const existing = world.get(px, top, pz);
       if (existing !== T.GRASS && existing !== T.MOSS && existing !== T.DIRT && existing !== T.MOSS_LIGHT) continue;
       world.set(px, top, pz, hash3(px, 41, pz) > 0.72 ? T.MOSS_LIGHT : T.MOSS);
-      if (hash3(px, 43, pz) > 0.9) world.set(px, top + 1, pz, T.MOSS);
+      if (hash3(px, 43, pz) > 0.9) setV(site, px, top + 1, pz, T.MOSS);
     }
   }
   return { r: r + 0.4 * R, footprint: r };

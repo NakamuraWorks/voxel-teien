@@ -12,7 +12,10 @@ export const RES = 2;
 export const SX = 128 * RES;
 export const SY = 48 * RES;
 export const SZ = 128 * RES;
-export const WATER_TOP = 12 * RES; // top voxel row of the pond surface
+export const SHORE_BENCH = 12 * RES; // height the banks, terraces and island are shaped to
+// Two world voxels (≈0.3 m) above that bench. The flattened bank top sits ~1 voxel over the
+// water, so the basin reads as nearly full without the surface spilling onto the shore.
+export const WATER_LEVEL = SHORE_BENCH + 2; // top voxel row of the pond/stream surface
 export const GROUND = 13 * RES; // nominal top row of the surrounding ground
 
 export const SEED = 20261117;

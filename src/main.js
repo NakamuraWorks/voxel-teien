@@ -9,7 +9,7 @@ import { settings, setInvertY } from './game/settings.js';
 import { createHud } from './ui/hud.js';
 import { placeName } from './ui/places.js';
 import { createAmbience } from './audio/ambience.js';
-import { pondField, STREAM, distToPolyline, WATER_TOP, ROUTE, RES, progressAlongPolyline } from './garden/layout.js';
+import { pondField, STREAM, distToPolyline, WATER_LEVEL, ROUTE, RES, progressAlongPolyline } from './garden/layout.js';
 import { clamp, smoothstep } from './core/noise.js';
 
 const canvas = document.getElementById('view');
@@ -306,7 +306,7 @@ function frame(now) {
       controller.update(dt);
       for (const step of controller.consumeSteps()) {
         audio.step(step.kind, step.surface, step.strength);
-        if (step.kind === 'splash') actors.ripple(player.pos.x, WATER_TOP + RES, player.pos.z, 0.55, 1.7);
+        if (step.kind === 'splash') actors.ripple(player.pos.x, WATER_LEVEL + RES, player.pos.z, 0.55, 1.7);
       }
     } else {
       player.enabled = false;

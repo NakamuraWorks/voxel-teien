@@ -3,7 +3,7 @@
 import { T } from '../core/palette.js';
 import { fbm2, noise2, clamp, smoothstep, lerp, hash3 } from '../core/noise.js';
 import {
-  SX, SZ, RES, WATER_TOP, GROUND, SEED, POND, pondField, STREAM, STREAM_WIDTH, distToPolyline,
+  SX, SZ, RES, SHORE_BENCH, WATER_LEVEL, GROUND, SEED, POND, pondField, STREAM, STREAM_WIDTH, distToPolyline,
   progressAlongPolyline, KARESANSUI, KARESANSUI_ROCKS, PLAZA, DECK, MOUND, ISLAND
 } from './layout.js';
 
@@ -50,7 +50,7 @@ function rectWeight(x, z, rect, margin) {
 
 /** Stream water surface rises toward the north so the water visibly falls toward the pond. */
 export function streamSurface(t) {
-  return WATER_TOP + RES * (3.4 * (1 - t) + 0.6 * (1 - t) * (1 - t));
+  return WATER_LEVEL + RES * (3.4 * (1 - t) + 0.6 * (1 - t) * (1 - t));
 }
 
 export function sculptHeights(site) {
@@ -62,14 +62,16 @@ export function sculptHeights(site) {
   for (let z = 0; z < SZ; z++) {
     for (let x = 0; x < SX; x++) {
       let h = heightFromPlan(x, z);
-      // Bank flattening so the pond sits in a believable basin.
+      // Bank flattening so the pond sits in a believable basin. The banks are shaped from
+      // the shore bench, NOT from the water surface: raising the water has to leave the
+      // land where it is, or the whole garden just slides upward and nothing looks higher.
       const field = pondField(x, z);
       if (field < 0.02) {
         const shore = 1 - smoothstep(0, 8, -field);
-        h = lerp(h, WATER_TOP + 1.6 * RES, shore * 0.85);
+        h = lerp(h, SHORE_BENCH + 1.6 * RES, shore * 0.85);
       }
       const dk = Math.hypot(x - pondCenter.x, z - pondCenter.z);
-      if (dk < 34 * RES) h = lerp(h, WATER_TOP + 1.6 * RES, (1 - smoothstep(16 * RES, 34 * RES, dk)) * 0.5);
+      if (dk < 34 * RES) h = lerp(h, SHORE_BENCH + 1.6 * RES, (1 - smoothstep(16 * RES, 34 * RES, dk)) * 0.5);
       // Terraces.
       h = lerp(h, Math.round(kasaTarget), rectWeight(x, z, KARESANSUI, 7 * RES) * 0.95);
       h = lerp(h, Math.round(plazaTarget), rectWeight(x, z, PLAZA, 5 * RES) * 0.95);
@@ -119,13 +121,17 @@ export function carveWater(site) {
       const i = gIndex(x, z);
       const field = pondField(x, z);
       if (field > 0) {
-        let floor = WATER_TOP - RES * (0.6 + 4.6 * smoothstep(0, 0.34, field));
+        // The basin profile hangs off the water surface, so raising the water lifts the bed
+        // with it: the pond keeps its depth profile instead of growing a step at the margin.
+        let floor = WATER_LEVEL - RES * (0.6 + 4.6 * smoothstep(0, 0.34, field));
         const idx = Math.hypot(x - ISLAND.x, z - ISLAND.z);
         if (idx < ISLAND.r) {
-          const cap = WATER_TOP + RES * (2.2 + 1.8 * Math.cos((idx / ISLAND.r) * (Math.PI / 2)));
+          // The island is land, so it stays on the shore bench and simply stands less proud
+          // of the raised water.
+          const cap = SHORE_BENCH + RES * (2.2 + 1.8 * Math.cos((idx / ISLAND.r) * (Math.PI / 2)));
           floor = Math.max(floor, cap);
         } else if (idx < ISLAND.r + 1.6 * RES) {
-          floor = Math.max(floor, WATER_TOP + 1.4 * RES);
+          floor = Math.max(floor, SHORE_BENCH + 1.4 * RES);
         }
         g[i] = floor;
         site.basinMask[i] = 1;
@@ -155,7 +161,7 @@ export function carveWater(site) {
       const isBasin = site.basinMask[i] === 1;
       const isStream = site.channelMask[i] === 1;
       if (!isBasin && !isStream) continue;
-      const top = isStream && isBasin === 0 ? site.waterSurface[i] : WATER_TOP;
+      const top = isStream && isBasin === 0 ? site.waterSurface[i] : WATER_LEVEL;
       const floor = Math.round(g[i]);
       let placed = 0;
       for (let y = floor + 1; y <= top; y++) {

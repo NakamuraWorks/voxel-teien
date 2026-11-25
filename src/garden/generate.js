@@ -3,7 +3,7 @@
 import { VoxelWorld } from '../core/world.js';
 import { T } from '../core/palette.js';
 import { Rng } from '../core/noise.js';
-import { SX, SY, SZ, RES, SEED, POND, WATER_TOP, STREAM } from './layout.js';
+import { SX, SY, SZ, RES, SEED, POND, WATER_LEVEL, STREAM } from './layout.js';
 import { sculptHeights, carveWater, paintGround, groundAt, gIndex } from './terrain.js';
 import { flattenRoute, laySteppingStones, routePolyline, spawnPoint, clearRoute, clearDeckView, pruneDetachedFoliage } from './paths.js';
 import { buildStructures } from './structures.js';
@@ -113,4 +113,4 @@ export function generateGarden(seed = SEED) {
   return site;
 }
 
-export { WATER_TOP, STREAM, SX, SY, SZ, groundAt };
+export { WATER_LEVEL, STREAM, SX, SY, SZ, groundAt };

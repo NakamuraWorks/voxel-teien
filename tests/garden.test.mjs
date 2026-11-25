@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateGarden } from '../src/garden/generate.js';
+import { generateGarden, createSite, gardenStages } from '../src/garden/generate.js';
 import { buildGeometries, Mesher, sliceRanges } from '../src/core/mesher.js';
 import { SX, SY, SZ, ROUTE, DECK, RES } from '../src/garden/layout.js';
 import { VIEW } from '../src/game/player.js';
@@ -90,6 +90,35 @@ test('every pond and stream column has water above its floor', () => {
     }
   }
   assert.equal(bad, 0, 'masked columns must have a water surface');
+});
+
+/**
+ * Hardscape census. Paving is only ever laid down by generation, so any stage that lowers the
+ * count is deleting walkable stone rather than the foliage it is meant to prune.
+ */
+function countPaving(world) {
+  let n = 0;
+  for (let i = 0; i < world.data.length; i++) {
+    const id = world.data[i];
+    if (id === T.STONE || id === T.STONE_DARK) n++;
+  }
+  return n;
+}
+
+test('no generation stage eats the paving', () => {
+  // A karikomi mound whose centre sits off the corridor still overhangs the 飛石 and used to
+  // stamp straight over it; the pruning pass then cut the foliage out and left a hole in the
+  // walkway for the walker to drop into.
+  const staged = createSite();
+  const counts = gardenStages(staged).map((stage) => {
+    stage.run();
+    return countPaving(staged.world);
+  });
+  const eaten = [];
+  for (let k = 1; k < counts.length; k++) {
+    if (counts[k] < counts[k - 1]) eaten.push(`-${counts[k - 1] - counts[k]}`);
+  }
+  assert.deepEqual(eaten, [], `stages removed paving voxels: ${eaten.join(' ')}`);
 });
 
 test('the strolling route stays walkable end to end', () => {
