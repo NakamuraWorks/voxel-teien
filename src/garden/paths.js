@@ -1,6 +1,6 @@
 // Corridor flattening and the stepping-stone route (飛石 / 延段).
 // All distances and steps are in world voxels (see layout.js RES).
-import { T } from '../core/palette.js';
+import { T, AIR, IS_SOLID } from '../core/palette.js';
 import { ROUTE, BRANCHES, KARESANSUI, PLAZA, DECK, SX, SZ, RES, BRIDGE, distToPolyline } from './layout.js';
 import { groundAt, gIndex } from './terrain.js';
 import { hash3, clamp, smoothstep } from '../core/noise.js';
@@ -287,6 +287,71 @@ export function clearDeckView(site, band = 6 * RES, corridor = 7 * RES) {
   }
 
   site.deckClearedVoxels = cut;
+  return cut;
+}
+
+const NB_X = [1, -1, 0, 0, 0, 0];
+const NB_Y = [0, 0, 1, -1, 0, 0];
+const NB_Z = [0, 0, 0, 0, 1, -1];
+
+/**
+ * Pruning shears trunks and bamboo at head height, which leaves whatever grew above the
+ * cut hanging in the air. One flood fill out of the soil marks everything the ground
+ * actually holds up; any plant voxel the fill never reaches is a remnant and comes out.
+ * Runs after every pruning pass, so the garden can never ship floating foliage.
+ */
+export function pruneDetachedFoliage(site) {
+  const world = site.world;
+  const { sizeX, sizeY, sizeZ } = world;
+  const N = sizeX * sizeY * sizeZ;
+  let solids = 0;
+  for (let i = 0; i < N; i++) if (IS_SOLID[world.data[i]] === 1) solids++;
+
+  const seen = new Uint8Array(N);
+  const stack = new Int32Array(solids);
+  let sp = 0;
+  const seedY = Math.floor(sizeY / 3);
+  for (let z = 0; z < sizeZ; z++) {
+    for (let x = 0; x < sizeX; x++) {
+      for (let y = 0; y <= seedY; y++) {
+        const i = (y * sizeZ + z) * sizeX + x;
+        if (seen[i] || IS_SOLID[world.data[i]] !== 1) continue;
+        seen[i] = 1;
+        stack[sp++] = i;
+      }
+    }
+  }
+  const slice = sizeX * sizeZ;
+  while (sp > 0) {
+    const i = stack[--sp];
+    const y = Math.floor(i / slice);
+    const rest = i - y * slice;
+    const z = Math.floor(rest / sizeX);
+    const x = rest - z * sizeX;
+    for (let k = 0; k < 6; k++) {
+      const nx = x + NB_X[k];
+      const ny = y + NB_Y[k];
+      const nz = z + NB_Z[k];
+      if (nx < 0 || ny < 0 || nz < 0 || nx >= sizeX || ny >= sizeY || nz >= sizeZ) continue;
+      const j = (ny * sizeZ + nz) * sizeX + nx;
+      if (seen[j] || IS_SOLID[world.data[j]] !== 1) continue;
+      seen[j] = 1;
+      stack[sp++] = j;
+    }
+  }
+
+  let cut = 0;
+  for (let i = 0; i < N; i++) {
+    if (seen[i] === 1) continue;
+    const id = world.data[i];
+    if (!OBSTRUCTING.has(id)) continue;
+    const y = Math.floor(i / slice);
+    const rest = i - y * slice;
+    const z = Math.floor(rest / sizeX);
+    world.set(rest - z * sizeX, y, z, AIR);
+    cut++;
+  }
+  site.detachedVoxels = cut;
   return cut;
 }
 

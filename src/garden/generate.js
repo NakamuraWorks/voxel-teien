@@ -5,7 +5,7 @@ import { T } from '../core/palette.js';
 import { Rng } from '../core/noise.js';
 import { SX, SY, SZ, RES, SEED, POND, WATER_TOP, STREAM } from './layout.js';
 import { sculptHeights, carveWater, paintGround, groundAt, gIndex } from './terrain.js';
-import { flattenRoute, laySteppingStones, routePolyline, spawnPoint, clearRoute, clearDeckView } from './paths.js';
+import { flattenRoute, laySteppingStones, routePolyline, spawnPoint, clearRoute, clearDeckView, pruneDetachedFoliage } from './paths.js';
 import { buildStructures } from './structures.js';
 import { plantGarden } from './plants.js';
 
@@ -82,7 +82,15 @@ export function gardenStages(site) {
     { label: '飛石を据える', weight: 1, run: () => laySteppingStones(site) },
     { label: '橋と灯籠を建てる', weight: 2, run: () => buildStructures(site) },
     { label: '木石を植える', weight: 5, run: () => plantGarden(site) },
-    { label: '延段を養生する', weight: 1, run: () => { clearRoute(site); clearDeckView(site); } },
+    {
+      label: '延段を養生する',
+      weight: 2,
+      run: () => {
+        clearRoute(site);
+        clearDeckView(site);
+        pruneDetachedFoliage(site);
+      }
+    },
     {
       label: '鯉を放つ',
       weight: 1,
